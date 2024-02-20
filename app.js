@@ -1,66 +1,53 @@
 // Import required modules
-const express = require("express");
-const bodyParser = require("body-parser");
-const axios = require("axios");
+const functions = require("@google-cloud/functions-framework");
 const dotenv = require("dotenv");
 
 // Load environment variables from .env file
 dotenv.config();
 
-// Create an Express application
-const app = express();
-const port = +process.env.PORT;
-
-// Parse JSON bodies of incoming requests
-app.use(bodyParser.json());
-
-// Handle POST request to create a support ticket
-app.post("/create-support-ticket", async (req, res) => {
+// Define an HTTP function named "createTicket" using Google Cloud Functions Framework
+functions.http("createTicket", async (req, res) => {
   try {
-    // Destructure body
+    // Extract request body
     const { body } = req;
-    // Define options for the HTTP request to Zendesk API
-    const options = {
-      method: "post",
-      // Construct URL using Zendesk subdomain from environment variables
-      url: `https://${process.env.ZENDESK_SUBDOMAIN}.zendesk.com/api/v2/requests.json`,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      // Provide basic authentication credentials
-      auth: {
-        username: process.env.ZENDESK_EMAIL,
-        password: process.env.ZENDESK_PASSWORD,
-      },
-      // Define data payload for the support ticket creation request
-      data: {
-        request: {
-          subject: body.question_summary,
-          // Use the question summary as the body of the ticket comment
-          comment: {
-            body: body.question_summary,
-          },
-          // Specify requester's name and email
-          requester: {
-            name: body.name,
-            email: body.email,
-          },
+    // Construct Zendesk API URL using environment variables
+    const url = `https://${process.env.ZENDESK_SUBDOMAIN}.zendesk.com/api/v2/requests.json`;
+    // Define data payload for creating the support ticket
+    const data = {
+      request: {
+        subject: body.question_summary,
+        // Use the question summary as the body of the ticket comment
+        comment: {
+          body: body.question_summary,
+        },
+        // Specify requester's name and email
+        requester: {
+          name: body.name,
+          email: body.email,
         },
       },
     };
 
-    // Send HTTP request to Zendesk API asynchronously
-    await axios(options);
-    // Respond with success message if ticket creation is successful
+    // Send a POST request to Zendesk API asynchronously
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+      // Parse the response as JSON
+      .then((response) => response.json())
+      // Log the response data
+      .then((data) => {
+        console.log(data);
+      });
+
+    // Respond to the client with a success message
     res.status(200).send("Support ticket created successfully");
   } catch (error) {
-    // Handle errors and respond with appropriate status code
+    // Handle errors and respond with an internal error message
     res.status(500).send("Internal error");
     console.error(error);
   }
-});
-
-// Start the server and listen on the specified port
-app.listen(port, () => {
-  console.log(`Server running on port ${port}.`);
 });
